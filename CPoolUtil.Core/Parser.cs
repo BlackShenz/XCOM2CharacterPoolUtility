@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -50,9 +50,8 @@ namespace CPoolUtil.Core
 
         public string GetString(int length)
         {
-            // Strings seem to be encoded in Windows 1252 (superset of Western European (ISO))
             var subArray = ReadBytes(length);
-            var encoding = CodePagesEncodingProvider.Instance.GetEncoding(1252);
+            var encoding = Encoding.UTF8;
 
             return encoding.GetString(subArray.Where(b => b != '\0').ToArray()).Replace("\r", Environment.NewLine); // Strip out any null terminating bytes and encode line feeds
         }
@@ -147,9 +146,11 @@ namespace CPoolUtil.Core
             if (value == null)
                 return new byte[0];
 
-            // Replace CRLF with CR, add a null terminating byte, and encode from Windows 1252
+            // Replace CRLF with CR, add a null terminating byte
             var formatted = value.Replace(Environment.NewLine, "\r").Append('\0').ToArray();
-            return CodePagesEncodingProvider.Instance.GetEncoding(1252).GetBytes(formatted);
+            var encoding = Encoding.UTF8;
+            // 使用UTF-8编码
+            return encoding.GetBytes(formatted);
         }
 
         public static byte[] WriteProperty(CProperty property)
