@@ -52,8 +52,9 @@ namespace CPoolUtil.Interface
             // Manually load files so we can handle potential duplicate soldiers
             for (int i = 0; i < fileNames.Length; i++)
             {
+                var parser = new Parser(fileNames[i], _outputter);
                 _currentFile = Path.GetFileName(fileNames[i]);
-                _appendingPool = new CPool(new Parser(fileNames[i], _outputter), _outputter);
+                _appendingPool = new CPool(_outputter);
                 _appendingPool.SendProgressUpdateEvent += (progress) =>
                 {
                     // Progress update event handler
@@ -77,7 +78,7 @@ namespace CPoolUtil.Interface
 
                 try
                 {
-                    _appendingPool.Load();
+                    _appendingPool.Load(parser);
                 }
                 catch (Exception ex)
                 {
@@ -94,38 +95,38 @@ namespace CPoolUtil.Interface
             var nonVanillaTemplates = Overlord.Templates.Where(t => t.Origin != "Vanilla").ToList();
 
             // Manually check template names against existing character list
-            var soldierTypes = Overlord.CharacterPool.Characters.Select(c => c.SoldierType.Data).Distinct().ToList();
-            var nameTypes = (Overlord.CharacterPool.Characters.Select(c => c.Appearance.Helmet.Data)
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Haircut.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Beard.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePropUpper.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePropLower.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePaint.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Scars.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.ArmorPatterns.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Torso.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.TorsoDeco.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Arms.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftArm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightArm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftForearm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightForearm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftArmDeco.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightArmDeco.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Tattoo_LeftArm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Tattoo_RightArm.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Legs.Data))
-                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Thighs.Data))
+            var soldierTypes = Overlord.CharacterPool.Characters.Select(c => c.SoldierType.Value).Distinct().ToList();
+            var nameTypes = (Overlord.CharacterPool.Characters.Select(c => c.Appearance.Helmet.Value)
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Haircut.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Beard.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePropUpper.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePropLower.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.FacePaint.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Scars.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.ArmorPatterns.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Torso.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.TorsoDeco.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Arms.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftArm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightArm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftForearm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightForearm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.LeftArmDeco.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.RightArmDeco.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Tattoo_LeftArm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Tattoo_RightArm.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Legs.Value))
+                .Concat(Overlord.CharacterPool.Characters.Select(c => c.Appearance.Thighs.Value))
                 ).Distinct().Where(nt => nt != null).ToList();
             detectedStuff.AddRange(nonVanillaTemplates.Where(t => ((t.PartType == "Pawn" && t.CharacterTemplate != "Soldier" && soldierTypes.Any(st => st == t.CharacterTemplate))
                 || nameTypes.Any(nt => nt == t.Name))
                 && !vanillaTemplateNames.Contains(t.Name)).Select(t => t.Origin).Distinct()); // If the name exists in vanilla as well, ignore it
 
             // Hair and armor color indexes (just detect if the index is outside of the vanilla range. It's not guaranteed that it is THESE specific mods that have expanded that selection)
-            var maxHairSelection = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.HairColor.DataVal) : 0;
-            var maxArmorSelection = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => Math.Max(c.Appearance.ArmorTint1.DataVal, c.Appearance.ArmorTint2.DataVal)) : 0;
-            var maxTattooColor = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.TattooTint.DataVal) : 0;
-            var maxWeaponColor = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.WeaponTint.DataVal) : 0;
+            var maxHairSelection = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.HairColor.Value) : 0;
+            var maxArmorSelection = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => Math.Max(c.Appearance.ArmorTint1.Value, c.Appearance.ArmorTint2.Value)) : 0;
+            var maxTattooColor = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.TattooTint.Value) : 0;
+            var maxWeaponColor = Overlord.CharacterPool.Characters.Count > 0 ? Overlord.CharacterPool.Characters.Max(c => c.Appearance.WeaponTint.Value) : 0;
             var maxVanillaHairSelection = Overlord.Palettes.Where(p => p.PaletteType == Palette.ePaletteType.HairColor).Max(p => p.Index);
             var maxVanillaArmorSelection = Overlord.Palettes.Where(p => p.PaletteType == Palette.ePaletteType.ArmorColor).Max(p => p.Index);
             if (!Overlord.DlcAndModOptions.Contains("More Hair Colors") && maxHairSelection > maxVanillaHairSelection)
@@ -156,7 +157,7 @@ namespace CPoolUtil.Interface
                 var unknownTypes = nameTypes.Where(nt => !Overlord.Templates.Any(t => t.Name == nt)).ToList();
                 if (unknownTypes.Any())
                 {
-                    var characters = Overlord.CharacterPool.Characters.Where(c => c.Appearance.Properties.Any(p => unknownTypes.Contains(p.Data))).ToList();
+                    var characters = Overlord.CharacterPool.Characters.Where(c => c.Appearance.Properties.Properties.Any(p => unknownTypes.Contains(p.Data))).ToList();
 
                     sb = new StringBuilder();
                     sb.AppendLine("Unknown templates detected! This means one or more characters are using parts NOT yet supported by this program, So if you choose a DIFFERENT part, you will lose the original modded one.");
@@ -253,7 +254,7 @@ namespace CPoolUtil.Interface
 
         private void UpdateDirtyStatus()
         {
-            lblFormStatus.Text = $"{Overlord.CharacterPool.PoolFileName?.Data ?? "(Unnamed Pool)"}{(Overlord.CharacterPool.IsDirty ? "*" : "")}";
+            lblFormStatus.Text = $"{Overlord.CharacterPool.PoolFileName?.Value ?? "(Unnamed Pool)"}{(Overlord.CharacterPool.IsDirty ? "*" : "")}";
             Text = $"Character Pool Editor{(Overlord.CharacterPool.IsDirty ? "*" : "")}";
             btnSavePool.Enabled = Overlord.CharacterPool.IsDirty;
         }
@@ -287,14 +288,14 @@ namespace CPoolUtil.Interface
 
             // Populate character information
             _ignoreDataChanges = true;
-            txtFirstName.Text = _selectedCharacter?.FirstName.Data;
-            txtNickName.Text = string.IsNullOrWhiteSpace(_selectedCharacter?.NickName.Data) ? string.Empty : _selectedCharacter.NickName.Data.Substring(1, _selectedCharacter.NickName.Data.Length - 2); // Strip apostrophes
-            txtLastName.Text = _selectedCharacter?.LastName.Data;
-            chkCanBeSoldier.Checked = _selectedCharacter?.CanBeSoldier.DataVal ?? false;
-            chkCanBeVIP.Checked = _selectedCharacter?.CanBeVIP.DataVal ?? false;
-            chkCanBeDarkVIP.Checked = _selectedCharacter?.CanBeDarkVIP.DataVal ?? false;
-            txtBiography.Text = _selectedCharacter?.Biography.Data;
-            lblCreatedOn.Text = $"Created On {_selectedCharacter?.CreatedOn.Data}";
+            txtFirstName.Text = _selectedCharacter?.FirstName.Value;
+            txtNickName.Text = _selectedCharacter?.NickName.Value;
+            txtLastName.Text = _selectedCharacter?.LastName.Value;
+            chkCanBeSoldier.Checked = _selectedCharacter?.CanBeSoldier.Value ?? false;
+            chkCanBeVIP.Checked = _selectedCharacter?.CanBeVIP.Value ?? false;
+            chkCanBeDarkVIP.Checked = _selectedCharacter?.CanBeDarkVIP.Value ?? false;
+            txtBiography.Text = _selectedCharacter?.Biography.Value;
+            lblCreatedOn.Text = $"Created On {_selectedCharacter?.CreatedOn.Value}";
             ResetDropdowns(); // Reset all dropdowns so nulls don't get populated with what we had selected from the last character
             _ignoreDataChanges = false;
             UpdateSoldierSelectables();
@@ -318,7 +319,7 @@ namespace CPoolUtil.Interface
 
         private void btnAddCharacter_Click(object sender, EventArgs e)
         {
-            Overlord.CharacterPool.AppendCharacters(Character.Create(_outputter, (++numCharactersAdded).ToString()));
+            Overlord.CharacterPool.AppendCharacters(Character.Create((++numCharactersAdded).ToString()));
             RefreshCharacterListDataSource();
         }
 
@@ -346,7 +347,7 @@ namespace CPoolUtil.Interface
             {
                 // Update PoolFileName first
                 var fileInfo = new FileInfo(sfd.FileName);
-                Overlord.CharacterPool.PoolFileName.Data = @$"CharacterPool\Importable\{fileInfo.Name}";
+                Overlord.CharacterPool.PoolFileName.Value = @$"CharacterPool\Importable\{fileInfo.Name}";
                 Overlord.CharacterPool.Save(sfd.FileName);
 
                 // Reset the pool - it has been saved!
@@ -386,7 +387,7 @@ namespace CPoolUtil.Interface
             lstCharacters.SelectionMode = SelectionMode.One;
             lstCharacters.ValueMember = "ID";
             lstCharacters.DisplayMember = "FullName";
-            lstCharacters.DataSource = Overlord.CharacterPool.Characters.OrderBy(c => c.FullName).ToList();
+            lstCharacters.DataSource = Overlord.CharacterPool.Characters.ToList();
             _ignoreDataChanges = false;
             if (oldIndex != -1 || lstCharacters.Items.Count == 0)
             {
@@ -415,19 +416,19 @@ namespace CPoolUtil.Interface
         private void CharacterTextProperty_Validated(object sender, EventArgs e)
         {
             if (_selectedCharacter != null && !_ignoreDataChanges &&
-            EditSoldier(_selectedCharacter.FirstName.Data, txtFirstName.Text.Trim(), d => _selectedCharacter.FirstName.Data = d)
-            | EditSoldier(_selectedCharacter.NickName.Data, $"'{txtNickName.Text.Trim()}'", d => _selectedCharacter.NickName.Data = d)
-            | EditSoldier(_selectedCharacter.LastName.Data, txtLastName.Text.Trim(), d => _selectedCharacter.LastName.Data = d)
-            | EditSoldier(_selectedCharacter.Biography.Data, txtBiography.Text.Trim(), d => _selectedCharacter.Biography.Data = d))
+            EditSoldier(_selectedCharacter.FirstName.Value, txtFirstName.Text.Trim(), d => _selectedCharacter.FirstName.Value = d)
+            | EditSoldier(_selectedCharacter.NickName.Value, txtNickName.Text.Trim(), d => _selectedCharacter.NickName.Value = d)
+            | EditSoldier(_selectedCharacter.LastName.Value, txtLastName.Text.Trim(), d => _selectedCharacter.LastName.Value = d)
+            | EditSoldier(_selectedCharacter.Biography.Value, txtBiography.Text.Trim(), d => _selectedCharacter.Biography.Value = d))
                 MarkCharactersModified(false, _selectedCharacters);
         }
 
         private void CharacterBoolProperty_Changed(object sender, EventArgs e)
         {
             if (_selectedCharacter != null && !_ignoreDataChanges &&
-            EditSoldier(_selectedCharacter.CanBeSoldier.DataVal, chkCanBeSoldier.Checked, d => _selectedCharacter.CanBeSoldier.DataVal = d)
-            | EditSoldier(_selectedCharacter.CanBeVIP.DataVal, chkCanBeVIP.Checked, d => _selectedCharacter.CanBeVIP.DataVal = d)
-            | EditSoldier(_selectedCharacter.CanBeDarkVIP.DataVal, chkCanBeDarkVIP.Checked, d => _selectedCharacter.CanBeDarkVIP.DataVal = d))
+            EditSoldier(_selectedCharacter.CanBeSoldier.Value, chkCanBeSoldier.Checked, d => _selectedCharacter.CanBeSoldier.Value = d)
+            | EditSoldier(_selectedCharacter.CanBeVIP.Value, chkCanBeVIP.Checked, d => _selectedCharacter.CanBeVIP.Value = d)
+            | EditSoldier(_selectedCharacter.CanBeDarkVIP.Value, chkCanBeDarkVIP.Checked, d => _selectedCharacter.CanBeDarkVIP.Value = d))
                 MarkCharactersModified(false, _selectedCharacters);
         }
 
@@ -447,43 +448,43 @@ namespace CPoolUtil.Interface
             _ignoreDataChanges = true;
 
             // Store the target values here for readability. Comboboxes should always try to reset to the character's old value unless the trigger WAS the combobox, in which case we set it to the selected value
-            var soldierType = (sourceCbx == cboSoldierType ? cboSoldierType.SelectedValue as string : _selectedCharacter?.SoldierType.Data) ?? "Soldier";
-            var gender = sourceCbx == cboGender && cboGender.SelectedValue is int ? (int)cboGender.SelectedValue : _selectedCharacter?.Appearance.Gender.DataVal ?? 1;
-            var race = sourceCbx == cboRace && cboRace.SelectedValue is int ? (int)cboRace.SelectedValue : _selectedCharacter?.Appearance.Race.DataVal ?? 0;
-            var attitude = sourceCbx == cboAttitude && cboAttitude.SelectedValue is int ? (int)cboAttitude.SelectedValue : _selectedCharacter?.Appearance.Attitude.DataVal ?? 0;
-            var preferredClass = sourceCbx == cboPreferredClass ? cboPreferredClass.SelectedValue as string : _selectedCharacter?.PreferredClass.Data;
-            var country = sourceCbx == cboCountry ? cboCountry.SelectedValue as string : _selectedCharacter?.Country.Data;
-            var eyeColor = sourceCbx == cboEyeColor && cboEyeColor.SelectedValue is int ? (int)cboEyeColor.SelectedValue : _selectedCharacter?.Appearance.EyeColor.DataVal ?? 0;
-            var voice = sourceCbx == cboVoice ? cboVoice.SelectedValue as string : _selectedCharacter?.Appearance.Voice.Data;
-            var skinColor = sourceCbx == cboSkinColor && cboSkinColor.SelectedValue is int ? (int)cboSkinColor.SelectedValue : _selectedCharacter?.Appearance.SkinColor.DataVal ?? 0;
-            var face = sourceCbx == cboFace ? cboFace.SelectedValue as string : _selectedCharacter?.Appearance.Head.Data;
-            var helmet = sourceCbx == cboHelmet ? cboHelmet.SelectedValue as string : _selectedCharacter?.Appearance.Helmet.Data;
-            var hair = sourceCbx == cboHair ? cboHair.SelectedValue as string : _selectedCharacter?.Appearance.Haircut.Data;
-            var hairColor = sourceCbx == cboHairColor && cboHairColor.SelectedValue is int ? (int)cboHairColor.SelectedValue : _selectedCharacter?.Appearance.HairColor.DataVal ?? 0;
-            var facialHair = sourceCbx == cboFacialHair ? cboFacialHair.SelectedValue as string : _selectedCharacter?.Appearance.Beard.Data;
-            var upperFaceProps = sourceCbx == cboUpperFaceProps ? cboUpperFaceProps.SelectedValue as string : _selectedCharacter?.Appearance.FacePropUpper.Data;
-            var lowerFaceProps = sourceCbx == cboLowerFaceProps ? cboLowerFaceProps.SelectedValue as string : _selectedCharacter?.Appearance.FacePropLower.Data;
-            var facePaint = sourceCbx == cboFacePaint ? cboFacePaint.SelectedValue as string : _selectedCharacter?.Appearance.FacePaint.Data;
-            var scars = sourceCbx == cboScars ? cboScars.SelectedValue as string : _selectedCharacter?.Appearance.Scars.Data;
-            var armorColor = sourceCbx == cboArmorColor && cboArmorColor.SelectedValue is int ? (int)cboArmorColor.SelectedValue : _selectedCharacter?.Appearance.ArmorTint1.DataVal ?? 0;
-            var secondArmorColor = sourceCbx == cboSecondArmorColor && cboSecondArmorColor.SelectedValue is int ? (int)cboSecondArmorColor.SelectedValue : _selectedCharacter?.Appearance.ArmorTint2.DataVal ?? 0;
-            var armorPattern = sourceCbx == cboArmorPattern ? cboArmorPattern.SelectedValue as string : _selectedCharacter?.Appearance.ArmorPatterns.Data;
-            var torso = sourceCbx == cboTorso ? cboTorso.SelectedValue as string : _selectedCharacter?.Appearance.Torso.Data;
-            var torsoGear = sourceCbx == cboTorsoGear ? cboTorsoGear.SelectedValue as string : _selectedCharacter?.Appearance.TorsoDeco.Data;
-            var arms = sourceCbx == cboArms ? cboArms.SelectedValue as string : _selectedCharacter?.Appearance.Arms.Data;
-            var leftArm = sourceCbx == cboLeftArm ? cboLeftArm.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.LeftArm.Data : "None";
-            var rightArm = sourceCbx == cboRightArm ? cboRightArm.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.RightArm.Data : "None";
-            var leftForearm = sourceCbx == cboLeftForearm ? cboLeftForearm.SelectedValue as string : _selectedCharacter?.Appearance.LeftForearm.Data;
-            var rightForearm = sourceCbx == cboRightForearm ? cboRightForearm.SelectedValue as string : _selectedCharacter?.Appearance.RightForearm.Data;
-            var leftShoulder = sourceCbx == cboLeftShoulder ? cboLeftShoulder.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.LeftArmDeco.Data : "None";
-            var rightShoulder = sourceCbx == cboRightShoulder ? cboRightShoulder.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.RightArmDeco.Data : "None";
-            var leftArmTattoo = sourceCbx == cboLeftArmTattoo ? cboLeftArmTattoo.SelectedValue as string : _selectedCharacter?.Appearance.Tattoo_LeftArm.Data;
-            var rightArmTattoo = sourceCbx == cboRightArmTattoo ? cboRightArmTattoo.SelectedValue as string : _selectedCharacter?.Appearance.Tattoo_RightArm.Data;
-            var legs = sourceCbx == cboLegs ? cboLegs.SelectedValue as string : _selectedCharacter?.Appearance.Legs.Data;
-            var thighs = sourceCbx == cboThighs ? cboThighs.SelectedValue as string : _selectedCharacter?.Appearance.Thighs.Data;
-            var tattooColor = sourceCbx == cboTattooColor && cboTattooColor.SelectedValue is int ? (int)cboTattooColor.SelectedValue : _selectedCharacter?.Appearance.TattooTint.DataVal ?? 0;
-            var weaponColor = sourceCbx == cboWeaponColor && cboWeaponColor.SelectedValue is int ? (int)cboWeaponColor.SelectedValue : _selectedCharacter?.Appearance.WeaponTint.DataVal ?? 0;
-            var weaponPattern = sourceCbx == cboWeaponPattern ? cboWeaponPattern.SelectedValue as string : _selectedCharacter?.Appearance.WeaponPattern.Data;
+            var soldierType = (sourceCbx == cboSoldierType ? cboSoldierType.SelectedValue as string : _selectedCharacter?.SoldierType.Value) ?? "Soldier";
+            var gender = sourceCbx == cboGender && cboGender.SelectedValue is int ? (int)cboGender.SelectedValue : _selectedCharacter?.Appearance.Gender.Value ?? 1;
+            var race = sourceCbx == cboRace && cboRace.SelectedValue is int ? (int)cboRace.SelectedValue : _selectedCharacter?.Appearance.Race.Value ?? 0;
+            var attitude = sourceCbx == cboAttitude && cboAttitude.SelectedValue is int ? (int)cboAttitude.SelectedValue : _selectedCharacter?.Appearance.Attitude.Value ?? 0;
+            var preferredClass = sourceCbx == cboPreferredClass ? cboPreferredClass.SelectedValue as string : _selectedCharacter?.PreferredClass.Value;
+            var country = sourceCbx == cboCountry ? cboCountry.SelectedValue as string : _selectedCharacter?.Country.Value;
+            var eyeColor = sourceCbx == cboEyeColor && cboEyeColor.SelectedValue is int ? (int)cboEyeColor.SelectedValue : _selectedCharacter?.Appearance.EyeColor.Value ?? 0;
+            var voice = sourceCbx == cboVoice ? cboVoice.SelectedValue as string : _selectedCharacter?.Appearance.Voice.Value;
+            var skinColor = sourceCbx == cboSkinColor && cboSkinColor.SelectedValue is int ? (int)cboSkinColor.SelectedValue : _selectedCharacter?.Appearance.SkinColor.Value ?? 0;
+            var face = sourceCbx == cboFace ? cboFace.SelectedValue as string : _selectedCharacter?.Appearance.Head.Value;
+            var helmet = sourceCbx == cboHelmet ? cboHelmet.SelectedValue as string : _selectedCharacter?.Appearance.Helmet.Value;
+            var hair = sourceCbx == cboHair ? cboHair.SelectedValue as string : _selectedCharacter?.Appearance.Haircut.Value;
+            var hairColor = sourceCbx == cboHairColor && cboHairColor.SelectedValue is int ? (int)cboHairColor.SelectedValue : _selectedCharacter?.Appearance.HairColor.Value ?? 0;
+            var facialHair = sourceCbx == cboFacialHair ? cboFacialHair.SelectedValue as string : _selectedCharacter?.Appearance.Beard.Value;
+            var upperFaceProps = sourceCbx == cboUpperFaceProps ? cboUpperFaceProps.SelectedValue as string : _selectedCharacter?.Appearance.FacePropUpper.Value;
+            var lowerFaceProps = sourceCbx == cboLowerFaceProps ? cboLowerFaceProps.SelectedValue as string : _selectedCharacter?.Appearance.FacePropLower.Value;
+            var facePaint = sourceCbx == cboFacePaint ? cboFacePaint.SelectedValue as string : _selectedCharacter?.Appearance.FacePaint.Value;
+            var scars = sourceCbx == cboScars ? cboScars.SelectedValue as string : _selectedCharacter?.Appearance.Scars.Value;
+            var armorColor = sourceCbx == cboArmorColor && cboArmorColor.SelectedValue is int ? (int)cboArmorColor.SelectedValue : _selectedCharacter?.Appearance.ArmorTint1.Value ?? 0;
+            var secondArmorColor = sourceCbx == cboSecondArmorColor && cboSecondArmorColor.SelectedValue is int ? (int)cboSecondArmorColor.SelectedValue : _selectedCharacter?.Appearance.ArmorTint2.Value ?? 0;
+            var armorPattern = sourceCbx == cboArmorPattern ? cboArmorPattern.SelectedValue as string : _selectedCharacter?.Appearance.ArmorPatterns.Value;
+            var torso = sourceCbx == cboTorso ? cboTorso.SelectedValue as string : _selectedCharacter?.Appearance.Torso.Value;
+            var torsoGear = sourceCbx == cboTorsoGear ? cboTorsoGear.SelectedValue as string : _selectedCharacter?.Appearance.TorsoDeco.Value;
+            var arms = sourceCbx == cboArms ? cboArms.SelectedValue as string : _selectedCharacter?.Appearance.Arms.Value;
+            var leftArm = sourceCbx == cboLeftArm ? cboLeftArm.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.LeftArm.Value : "None";
+            var rightArm = sourceCbx == cboRightArm ? cboRightArm.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.RightArm.Value : "None";
+            var leftForearm = sourceCbx == cboLeftForearm ? cboLeftForearm.SelectedValue as string : _selectedCharacter?.Appearance.LeftForearm.Value;
+            var rightForearm = sourceCbx == cboRightForearm ? cboRightForearm.SelectedValue as string : _selectedCharacter?.Appearance.RightForearm.Value;
+            var leftShoulder = sourceCbx == cboLeftShoulder ? cboLeftShoulder.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.LeftArmDeco.Value : "None";
+            var rightShoulder = sourceCbx == cboRightShoulder ? cboRightShoulder.SelectedValue as string : arms == "None" ? _selectedCharacter?.Appearance.RightArmDeco.Value : "None";
+            var leftArmTattoo = sourceCbx == cboLeftArmTattoo ? cboLeftArmTattoo.SelectedValue as string : _selectedCharacter?.Appearance.Tattoo_LeftArm.Value;
+            var rightArmTattoo = sourceCbx == cboRightArmTattoo ? cboRightArmTattoo.SelectedValue as string : _selectedCharacter?.Appearance.Tattoo_RightArm.Value;
+            var legs = sourceCbx == cboLegs ? cboLegs.SelectedValue as string : _selectedCharacter?.Appearance.Legs.Value;
+            var thighs = sourceCbx == cboThighs ? cboThighs.SelectedValue as string : _selectedCharacter?.Appearance.Thighs.Value;
+            var tattooColor = sourceCbx == cboTattooColor && cboTattooColor.SelectedValue is int ? (int)cboTattooColor.SelectedValue : _selectedCharacter?.Appearance.TattooTint.Value ?? 0;
+            var weaponColor = sourceCbx == cboWeaponColor && cboWeaponColor.SelectedValue is int ? (int)cboWeaponColor.SelectedValue : _selectedCharacter?.Appearance.WeaponTint.Value ?? 0;
+            var weaponPattern = sourceCbx == cboWeaponPattern ? cboWeaponPattern.SelectedValue as string : _selectedCharacter?.Appearance.WeaponPattern.Value;
 
             // Set every dropdown's datasource and value (from the character - if the old value no longer exists in the dropdown, it will default to the first selection), ensuring correct order for filters to work.
             SetComboBoxDataSourceAndValue(cboSoldierType, Overlord.FilteredTemplates.Where(c => c.PartType == "Pawn" && c.CharacterTemplate.Contains("Soldier") && !string.IsNullOrWhiteSpace(c.Display)).GroupBy(g => g.CharacterTemplate).Select(g => g.First()), soldierType);
@@ -571,53 +572,53 @@ namespace CPoolUtil.Interface
             // If any of the following edits are successful (using non-short-circuiting operators), mark the character as modified and refresh the list
             if (_selectedCharacter != null &&
             // Character Info tab
-            EditSoldier(_selectedCharacter.SoldierType.Data, soldierType, (d) => _selectedCharacter.SoldierType.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Gender.DataVal, cboGender.SelectedValue as int? ?? 1, (d) => _selectedCharacter.Appearance.Gender.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.Race.DataVal, cboRace.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.Race.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.Attitude.DataVal, cboAttitude.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.Attitude.DataVal = d)
-            | EditSoldier(_selectedCharacter.PreferredClass.Data, cboPreferredClass.SelectedValue as string, (d) => _selectedCharacter.PreferredClass.Data = d)
-            | EditSoldier(_selectedCharacter.Country.Data, cboCountry.SelectedValue as string, (d) => _selectedCharacter.Country.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Flag.Data, cboCountry.SelectedValue as string, (d) => _selectedCharacter.Appearance.Flag.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Voice.Data, cboVoice.SelectedValue as string, (d) => _selectedCharacter.Appearance.Voice.Data = d)
+            EditSoldier(_selectedCharacter.SoldierType.Value, soldierType, (d) => _selectedCharacter.SoldierType.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Gender.Value, cboGender.SelectedValue as int? ?? 1, (d) => _selectedCharacter.Appearance.Gender.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Race.Value, cboRace.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.Race.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Attitude.Value, cboAttitude.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.Attitude.Value = d)
+            | EditSoldier(_selectedCharacter.PreferredClass.Value, cboPreferredClass.SelectedValue as string, (d) => _selectedCharacter.PreferredClass.Value = d)
+            | EditSoldier(_selectedCharacter.Country.Value, cboCountry.SelectedValue as string, (d) => _selectedCharacter.Country.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Flag.Value, cboCountry.SelectedValue as string, (d) => _selectedCharacter.Appearance.Flag.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Voice.Value, cboVoice.SelectedValue as string, (d) => _selectedCharacter.Appearance.Voice.Value = d)
 
             // Head Appearance tab
-            | EditSoldier(_selectedCharacter.Appearance.SkinColor.DataVal, cboSkinColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.SkinColor.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.EyeColor.DataVal, cboEyeColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.EyeColor.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.Head.Data, cboFace.SelectedValue as string, (d) => _selectedCharacter.Appearance.Head.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Helmet.Data, cboHelmet.SelectedValue as string, (d) => _selectedCharacter.Appearance.Helmet.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Haircut.Data, cboHair.SelectedValue as string, (d) => _selectedCharacter.Appearance.Haircut.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.HairColor.DataVal, cboHairColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.HairColor.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.Beard.Data, cboFacialHair.SelectedValue as string, (d) => _selectedCharacter.Appearance.Beard.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.FacePropUpper.Data, cboUpperFaceProps.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePropUpper.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.FacePropLower.Data, cboLowerFaceProps.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePropLower.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.FacePaint.Data, cboFacePaint.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePaint.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Scars.Data, cboScars.SelectedValue as string, (d) => _selectedCharacter.Appearance.Scars.Data = d)
+            | EditSoldier(_selectedCharacter.Appearance.SkinColor.Value, cboSkinColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.SkinColor.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.EyeColor.Value, cboEyeColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.EyeColor.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Head.Value, cboFace.SelectedValue as string, (d) => _selectedCharacter.Appearance.Head.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Helmet.Value, cboHelmet.SelectedValue as string, (d) => _selectedCharacter.Appearance.Helmet.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Haircut.Value, cboHair.SelectedValue as string, (d) => _selectedCharacter.Appearance.Haircut.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.HairColor.Value, cboHairColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.HairColor.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Beard.Value, cboFacialHair.SelectedValue as string, (d) => _selectedCharacter.Appearance.Beard.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.FacePropUpper.Value, cboUpperFaceProps.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePropUpper.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.FacePropLower.Value, cboLowerFaceProps.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePropLower.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.FacePaint.Value, cboFacePaint.SelectedValue as string, (d) => _selectedCharacter.Appearance.FacePaint.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Scars.Value, cboScars.SelectedValue as string, (d) => _selectedCharacter.Appearance.Scars.Value = d)
 
             // Body Appearance tab
-            | EditSoldier(_selectedCharacter.Appearance.ArmorTint1.DataVal, cboArmorColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.ArmorTint1.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.ArmorTint2.DataVal, cboSecondArmorColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.ArmorTint2.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.ArmorPatterns.Data, cboArmorPattern.SelectedValue as string, (d) => _selectedCharacter.Appearance.ArmorPatterns.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Torso.Data, cboTorso.SelectedValue as string, (d) => _selectedCharacter.Appearance.Torso.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.TorsoUnderlay.Data, torsoUnderlay, (d) => _selectedCharacter.Appearance.TorsoUnderlay.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.TorsoDeco.Data, cboTorsoGear.SelectedValue as string, (d) => _selectedCharacter.Appearance.TorsoDeco.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Arms.Data, cboArms.SelectedValue as string, (d) => _selectedCharacter.Appearance.Arms.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.ArmsUnderlay.Data, armsUnderlay, (d) => _selectedCharacter.Appearance.ArmsUnderlay.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.LeftArm.Data, cboLeftArm.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftArm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.RightArm.Data, cboRightArm.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightArm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.LeftForearm.Data, cboLeftForearm.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftForearm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.RightForearm.Data, cboRightForearm.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightForearm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.LeftArmDeco.Data, cboLeftShoulder.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftArmDeco.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.RightArmDeco.Data, cboRightShoulder.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightArmDeco.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Tattoo_LeftArm.Data, cboLeftArmTattoo.SelectedValue as string, (d) => _selectedCharacter.Appearance.Tattoo_LeftArm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Tattoo_RightArm.Data, cboRightArmTattoo.SelectedValue as string, (d) => _selectedCharacter.Appearance.Tattoo_RightArm.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Legs.Data, cboLegs.SelectedValue as string, (d) => _selectedCharacter.Appearance.Legs.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.LegsUnderlay.Data, legsUnderlay, (d) => _selectedCharacter.Appearance.LegsUnderlay.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.Thighs.Data, cboThighs.SelectedValue as string, (d) => _selectedCharacter.Appearance.Thighs.Data = d)
-            | EditSoldier(_selectedCharacter.Appearance.TattooTint.DataVal, cboTattooColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.TattooTint.DataVal = d)
+            | EditSoldier(_selectedCharacter.Appearance.ArmorTint1.Value, cboArmorColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.ArmorTint1.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.ArmorTint2.Value, cboSecondArmorColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.ArmorTint2.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.ArmorPatterns.Value, cboArmorPattern.SelectedValue as string, (d) => _selectedCharacter.Appearance.ArmorPatterns.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Torso.Value, cboTorso.SelectedValue as string, (d) => _selectedCharacter.Appearance.Torso.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.TorsoUnderlay.Value, torsoUnderlay, (d) => _selectedCharacter.Appearance.TorsoUnderlay.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.TorsoDeco.Value, cboTorsoGear.SelectedValue as string, (d) => _selectedCharacter.Appearance.TorsoDeco.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Arms.Value, cboArms.SelectedValue as string, (d) => _selectedCharacter.Appearance.Arms.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.ArmsUnderlay.Value, armsUnderlay, (d) => _selectedCharacter.Appearance.ArmsUnderlay.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.LeftArm.Value, cboLeftArm.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftArm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.RightArm.Value, cboRightArm.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightArm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.LeftForearm.Value, cboLeftForearm.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftForearm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.RightForearm.Value, cboRightForearm.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightForearm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.LeftArmDeco.Value, cboLeftShoulder.SelectedValue as string, (d) => _selectedCharacter.Appearance.LeftArmDeco.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.RightArmDeco.Value, cboRightShoulder.SelectedValue as string, (d) => _selectedCharacter.Appearance.RightArmDeco.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Tattoo_LeftArm.Value, cboLeftArmTattoo.SelectedValue as string, (d) => _selectedCharacter.Appearance.Tattoo_LeftArm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Tattoo_RightArm.Value, cboRightArmTattoo.SelectedValue as string, (d) => _selectedCharacter.Appearance.Tattoo_RightArm.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Legs.Value, cboLegs.SelectedValue as string, (d) => _selectedCharacter.Appearance.Legs.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.LegsUnderlay.Value, legsUnderlay, (d) => _selectedCharacter.Appearance.LegsUnderlay.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.Thighs.Value, cboThighs.SelectedValue as string, (d) => _selectedCharacter.Appearance.Thighs.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.TattooTint.Value, cboTattooColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.TattooTint.Value = d)
 
             // Weapon Appearance tab
-            | EditSoldier(_selectedCharacter.Appearance.WeaponTint.DataVal, cboWeaponColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.WeaponTint.DataVal = d)
-            | EditSoldier(_selectedCharacter.Appearance.WeaponPattern.Data, cboWeaponPattern.SelectedValue as string, (d) => _selectedCharacter.Appearance.WeaponPattern.Data = d))
+            | EditSoldier(_selectedCharacter.Appearance.WeaponTint.Value, cboWeaponColor.SelectedValue as int? ?? 0, (d) => _selectedCharacter.Appearance.WeaponTint.Value = d)
+            | EditSoldier(_selectedCharacter.Appearance.WeaponPattern.Value, cboWeaponPattern.SelectedValue as string, (d) => _selectedCharacter.Appearance.WeaponPattern.Value = d))
                 MarkCharactersModified(false, _selectedCharacter);
             _ignoreDataChanges = false;
         }
@@ -629,7 +630,7 @@ namespace CPoolUtil.Interface
             if (newDs is List<Template> templateList)
             {
                 // Automatically add "None" if we need it (if the type is correct, our value member is "Name", we don't already have a "None" in the list, and either (target value is "None" or we have no items))
-                if (cbx.ValueMember == "Name" && !templateList.Any(t => t.Name == "None") && (targetValue as string == "None" || !templateList.Any()))
+                if (cbx.ValueMember == "Name" && !templateList.Any(t => t.Name == "None") && (targetValue as string == "None" || templateList.Count == 0))
                     (newDs as List<Template>).Insert(0, Overlord.Templates.First(t => t.Name == "None"));
 
                 // Get the values of each of the target template property using reflection. If our target value isn't in that list, create it

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,19 +8,18 @@ namespace CPoolUtil.Core
     #region Property types
 
     [DebuggerDisplay("{Name} = {Data}")]
+    /// <summary>
+    ///                (             propertyName             )           (              propertyType             )           (         data           (     anything      ))
+    /// common format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| eachProperty format
+    /// </summary>
     public abstract class CProperty
     {
-        protected Parser Parser { get; set; }
-
-        public string Name { get; protected set; }
+        public string Name { get; protected set; } = "";
         public string FriendlyName { get; private set; }
-        public string Data { get; set; }
+        public string Data { get; protected set; }
 
-        public abstract void ParseData();
-
-        public CProperty(string name, Parser parser)
+        public CProperty(string name)
         {
-            Parser = parser;
             Name = name;
 
             // Top level properties
@@ -96,11 +95,7 @@ namespace CPoolUtil.Core
 
         public virtual CProperty Clone()
         {
-            var cloned = MemberwiseClone() as CProperty;
-            cloned.Name = Name;
-            cloned.FriendlyName = FriendlyName;
-            cloned.Data = Data;
-            return cloned;
+            return MemberwiseClone() as CProperty;
         }
 
         public bool IsDuplicate(CProperty otherProperty)
@@ -108,139 +103,98 @@ namespace CPoolUtil.Core
             return otherProperty.Data == Data;
         }
 
+        public virtual string GetPropertyType()
+        {
+            return GetType().Name;
+        }
+
+        public abstract void ParseData(Parser parser);
+
         public abstract byte[] WriteSizeAndData();
     }
 
-    // Data = Simple 4 byte number
-    public class IntProperty : CProperty
+    // Data = bytes
+    /// <summary>
+    ///                                                                                                              4+byteslength+padding 
+    ///         (             propertyName             )           (              propertyType             )           (           data         (          bytes              ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| bytesLength - bytes - padding
+    public class ByteProperty : CProperty
     {
-        private IntProperty(string name, int newValue) : base(name, null)
+        public byte[] Value
         {
-            DataVal = newValue;
+            get => _val;
+            set
+            {
+                _val = value;
+                Data = value.ToString();
+            }
+        }
+        private byte[] _val;
+
+        public ByteProperty(string name) : base(name) { }
+
+        private ByteProperty(string name, byte[] newValue) : base(name)
+        {
+            Value = newValue ?? [];
         }
 
-        public int DataVal
+        public static ByteProperty Create(string name, byte[] value = null)
         {
-            get => int.Parse(Data);
-            set => Data = value.ToString();
+            return new ByteProperty(name, value);
         }
 
-        public IntProperty(string name, Parser parser) : base(name, parser) { }
-
-        public override void ParseData()
+        public override void ParseData(Parser Parser)
         {
-            Data = Parser.GetInt().ToString(); // We know the size is always 4, so just call Getint()
-        }
-
-        public static IntProperty Create(string name, int value = 0)
-        {
-            return new IntProperty(name, value);
+            var actualLength = Parser.GetInt();
+            Value = Parser.GetBytes(actualLength);
+            Parser.SkipPadding();
         }
 
         public override byte[] WriteSizeAndData()
         {
-            // Size (4), Padding, Value
-            return Parser.WriteInt(4).Concat(Parser.WritePadding()).Concat(Parser.WriteInt(DataVal)).ToArray();
+            var bytes = Value;
+            // Size (always int(4)+byteslength+padding(4)), Padding, bytesLength, bytes, Padding
+            return [.. Parser.WriteInt(bytes.Length+8), ..Parser.WritePadding(), .. Parser.WriteInt(bytes.Length), .. bytes, .. Parser.WritePadding()];
         }
     }
 
-    // Data = Number of elements in an array. Same format as IntProperty
-    public class ArrayProperty : IntProperty
+    public class NoneProperty : CProperty
     {
-        private ArrayProperty(string name, int newValue) : base(name, null)
+        public NoneProperty(string name) : base(name)
         {
-            DataVal = newValue;
+            Data = "null";
         }
-
-        public ArrayProperty(string name, Parser parser) : base(name, parser) { }
-
-        public static ArrayProperty Create(string name, int value = 0)
+        public override void ParseData(Parser parser)
         {
-            return new ArrayProperty(name, value);
+            // No data to parse
         }
-    }
-
-    // Data = ASCII(?) encoded text block
-    public class StrProperty : CProperty
-    {
-        protected int DataLength;
-
-        protected StrProperty(string name, string newValue) : base(name, null)
-        {
-            Data = newValue;
-        }
-
-        public StrProperty(int dataLength, string name, Parser parser) : base(name, parser)
-        {
-            DataLength = dataLength;
-        }
-
-        public override void ParseData()
-        {
-            // The actual size is the data length - 4, to account for the extra potential size definition
-            int actualSize = DataLength - 4;
-            Parser.GetInt();
-            Data = Parser.GetString(actualSize);
-        }
-
-        public static StrProperty Create(string name, string value = null)
-        {
-            return new StrProperty(name, value);
-        }
-
         public override byte[] WriteSizeAndData()
         {
-            var formatted = Parser.WriteString(Data);
-
-            // Size + 4, Padding, Size, Value
-            return Parser.WriteInt(formatted.Length + 4).Concat(Parser.WritePadding()).Concat(Parser.WriteInt(formatted.Length)).Concat(formatted).ToArray();
-        }
-    }
-
-    // Data = Like StrProperty, but with end padding
-    public class NameProperty : StrProperty
-    {
-        private NameProperty(string name, string newValue) : base(name, null)
-        {
-            Data = newValue;
-        }
-
-        public NameProperty(int dataLength, string name, Parser parser) : base(dataLength, name, parser) { }
-
-        public new static NameProperty Create(string name, string value = null)
-        {
-            return new NameProperty(name, value);
-        }
-
-        public override byte[] WriteSizeAndData()
-        {
-            var formatted = Parser.WriteString(Data);
-
-            // Size + 8, Padding, Size, Value, Padding
-            return Parser.WriteInt(formatted.Length + 8).Concat(Parser.WritePadding()).Concat(Parser.WriteInt(formatted.Length)).Concat(formatted).Concat(Parser.WritePadding()).ToArray();
+            return [];
         }
     }
 
     // Data = 1 or 0
+    /// <summary>
+    ///         (             propertyName             )           (              propertyType             )           ( (always0)     data     (bool 1bit))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| boolValue
     public class BoolProperty : CProperty
     {
-        private BoolProperty(string name, bool newValue) : base(name, null)
+        public bool Value
         {
-            DataVal = newValue;
+            get => _val;
+            set
+            {
+                _val = value;
+                Data = value.ToString();
+            }
         }
+        private bool _val;
+        public BoolProperty(string name) : base(name) { }
 
-        public BoolProperty(string name, Parser parser) : base(name, parser) { }
-
-        public bool DataVal
+        private BoolProperty(string name, bool newValue) : this(name)
         {
-            get => Data == "1";
-            set => Data = value ? "1" : "0";
-        }
-
-        public override void ParseData()
-        {
-            // One byte of data
-            Data = Parser.GetBytes(1)[0].ToString();
+            Value = newValue;
         }
 
         public static BoolProperty Create(string name, bool value = false)
@@ -248,64 +202,252 @@ namespace CPoolUtil.Core
             return new BoolProperty(name, value);
         }
 
+        public override void ParseData(Parser Parser)
+        {
+            // One byte of data
+            Value = (Parser.GetBytes(1)[0]) == 1;
+        }
+
         public override byte[] WriteSizeAndData()
         {
-            // Size (always 0), Padding, Value
-            return Parser.WriteInt(0).Concat(Parser.WritePadding()).Concat(BitConverter.GetBytes(DataVal)).ToArray();
+            // Size (always 0), Padding, Data
+            return [.. Parser.WriteInt(0), .. Parser.WritePadding(), .. BitConverter.GetBytes(Value)];
+        }
+    }
+
+    // Data = Simple 4 byte number
+    /// <summary>
+    ///         (             propertyName             )           (              propertyType             )           ( (always4)     data     (   int  ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| intValue
+    public class IntProperty : CProperty
+    {
+        public int Value
+        {
+            get => _val;
+            set
+            {
+                _val = value;
+                Data = value.ToString();
+            }
+        }
+        private int _val;
+
+        public IntProperty(string name) : base(name) { }
+        private IntProperty(string name, int newValue) : this(name)
+        {
+            Value = newValue;
+        }
+
+        public static IntProperty Create(string name, int value = 0)
+        {
+            return new IntProperty(name, value);
+        }
+
+        public override void ParseData(Parser Parser)
+        {
+            Value = Parser.GetInt(); // We know the size is always 4, so just call Getint()
+        }
+
+        public override byte[] WriteSizeAndData()
+        {
+            // Size (4), Padding, Data
+            return [.. Parser.WriteInt(4), .. Parser.WritePadding(), .. Parser.WriteInt(Value)];
+        }
+    }
+
+    // Data = ASCII(?) encoded text block
+    /// <summary>
+    ///         (             propertyName             )           (              propertyType             )           (         data           (         string        ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| encodeedLength - string 
+    public class StrProperty : CProperty
+    {
+        public string Value
+        {
+            get => _val;
+            set
+            {
+                value = value ?? "";
+                _val = value;
+                Data = value.ToString();
+            }
+        }
+        private string _val;
+
+        public StrProperty(string name) : base(name) { }
+        private StrProperty(string name, string newValue) : this(name)
+        {
+            Value = newValue;
+        }
+
+        public static StrProperty Create(string name, string value = "")
+        {
+            return new StrProperty(name, value);
+        }
+
+        public override void ParseData(Parser Parser)
+        {
+            // 使用Parser中的统一解析逻辑
+            Value = Parser.ParseStrProperty();
+        }
+
+        public override byte[] WriteSizeAndData()
+        {
+            // 使用新的WriteStrPropertyData方法，根据文本内容自动选择编码格式
+            var formatted = Parser.WriteStrPropertyData(Value);
+
+            // Size + 4, Padding, Size, Data
+            return [.. Parser.WriteInt(formatted.Length), .. Parser.WritePadding(), .. formatted];
+        }
+    }
+
+    // Data = Like StrProperty, but with end padding
+    /// <summary>
+    ///         (             propertyName             )           (              propertyType             )           (         data           (               string                ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| stringLength - string .. \0 - padding
+    /// </summary>
+    public class NameProperty : CProperty
+    {
+        public string Value
+        {
+            get => _val;
+            set
+            {
+                value = value ?? "";
+                _val = value;
+                Data = value.ToString();
+            }
+        }
+        private string _val;
+
+        public NameProperty(string name) : base(name) { }
+
+        private NameProperty(string name, string newValue) : this(name)
+        {
+            Value = newValue;
+        }
+
+        public static NameProperty Create(string name, string value = "")
+        {
+            return new NameProperty(name, value);
+        }
+
+        public override void ParseData(Parser Parser)
+        {
+            int actualSize = Parser.GetInt();
+            Value = Parser.GetString(actualSize);
+            Parser.SkipPadding();
+        }
+
+        public override byte[] WriteSizeAndData()
+        {
+            var formatted = Parser.WriteString(Value);
+
+            // Size + 8, Padding, Size, Data, Padding
+            return
+            [
+                .. Parser.WriteInt(formatted.Length + 8),
+                .. Parser.WritePadding(),
+                .. Parser.WriteInt(formatted.Length),
+                .. formatted,
+                .. Parser.WritePadding(),
+            ];
+        }
+    }
+
+    // Data = Number of elements in an array. with elements
+    /// <summary>
+    ///         (             propertyName             )           (              propertyType             )           (after padding to None<p>  data        (       array elements       ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLenght - padding |-| arrayLength - elements(end with None<p>) ..
+    /// </summary>
+    public class ArrayProperty : CProperty
+    {
+        public List<PropertyBag> Properties = new();
+        public int ArrayLength { get => Properties.Count; }
+
+        public ArrayProperty(string name) : base(name)
+        {
+        }
+
+        private ArrayProperty(string name, params CProperty[] properties) : base(name)
+        {
+        }
+
+        public static ArrayProperty Create(string name, params CProperty[] properties)
+        {
+            return new ArrayProperty(name, properties);
+        }
+
+        public override void ParseData(Parser Parser)
+        {
+            var arrayLength = Parser.GetInt();
+            for (int i = 0;i<arrayLength;i++)
+            {
+                var elem = new PropertyBag();
+                elem.ParseData(Parser);
+                Properties.Add(elem);
+            }
+
+            // For comparison purposes, serialize all Properties name and value into Data
+            Data = string.Join(" ", Properties.SelectMany(b => b.Properties.Select(p => $"{p.Name}:{p.Data}")));
+        }
+
+        public override byte[] WriteSizeAndData()
+        {
+            // Get the data of all sub Properties
+            byte[] elemBytes = [.. Properties.SelectMany<PropertyBag, byte>(p => [.. p.WriteSizeAndData(), ..Parser.WriteNone()])];
+            byte[] totalBytes = [..Parser.WriteInt(ArrayLength), .. elemBytes];
+
+            return [.. Parser.WriteInt(totalBytes.Length), .. Parser.WritePadding(), .. totalBytes];
         }
     }
 
     // Data = A subcollection of properties
+    ///         (             propertyName             )           (              propertyType             )           (after type's padding to None<p>                     data                        (    struct fields   ))
+    /// format : properyNameLength - propertyName .. \0 - padding - propertyTypeLength - propertyType .. \0 - padding - dataLength - padding |-| structTypeNameLenght - sturctTypeName .. \0 - padding - eachFields - None<p>
+    /// </summary>
     public class StructProperty : CProperty
     {
-        public PropertyBag Properties { get; private set; }
+        public PropertyBag Properties = new();
+        public string StructType { get; private set; }
 
-        private StructProperty(string name, params CProperty[] properties) : base(name, null)
+        public StructProperty(string name) : base(name)
         {
-            Properties = PropertyBag.Create(properties);
         }
 
-        public StructProperty(string name, Parser parser, IOutputter outputter) : base(name, parser)
+        public StructProperty(string name, string typeName) : this(name)
         {
-            Properties = new PropertyBag(parser, outputter);
+            StructType = typeName;
         }
 
-        public override void ParseData()
+        protected StructProperty(string name, string typeName, params CProperty[] properties) : this(name, typeName)
         {
-            // Read the "TAppearance" string and padding
-            int headerLength = Parser.GetInt();
-            Parser.GetString(headerLength);
+            Properties.Properties = [.. properties];
+        }
+
+        public static StructProperty Create(string name, string typeName, params CProperty[] properties)
+        {
+            return new StructProperty(name, typeName, properties);
+        }
+
+        public override void ParseData(Parser Parser)
+        {
+            int structTypeLength = Parser.GetInt();
+            StructType = Parser.GetString(structTypeLength);
             Parser.SkipPadding();
-
-            // Parse the properties of this struct and store them in its own list
-            Properties.GetProperties();
-
-            // For comparison purposes, serialize all properties name and value into Data
-            Data = string.Join("", Properties.Properties.Select(p => $"{p.Name}{p.Data}"));
-        }
-
-        public static StructProperty Create(string name, params CProperty[] properties)
-        {
-            return new StructProperty(name, properties);
-        }
-
-        public override StructProperty Clone()
-        {
-            var cloned = base.Clone() as StructProperty;
-            cloned.Properties = Properties.Clone();
-            return cloned;
+            Properties.ParseData(Parser);
         }
 
         public override byte[] WriteSizeAndData()
         {
-            // Get the data of all sub properties
-            var bytes = Properties.WriteProperties();
+            // Get the data of all sub Properties
+            byte[] bytes = [.. Properties.Properties.SelectMany(p => Parser.WriteProperty(p)), .. Parser.WriteNone()];
+            var bytesType = Parser.WriteString(StructType);
 
-            // Size is the combined length of all the properties AFTER the TAppearance string, plus our own ending "None"
-            var tAppearanceBytes = Parser.WriteInt(bytes.Count()).Concat(Parser.WritePadding()).Concat(Parser.WriteInt(12)).Concat(Parser.WriteString("TAppearance")).Concat(Parser.WritePadding());
+            // Size is the combined length of all the Properties AFTER the TAppearance string, plus our own ending "None"
+            byte[] structBytes = [.. Parser.WriteInt(bytes.Length), .. Parser.WritePadding(), .. Parser.WriteInt(bytesType.Length), .. bytesType, .. Parser.WritePadding()];
 
-            // Size (combined length of all the properties AFTER the TAppearance string, plus our own ending "None"), Padding, TApperance Length & String, All Property Values, "None"
-            return tAppearanceBytes.Concat(bytes).ToArray();
+            // Size (combined length of all the Properties AFTER the TAppearance string, plus our own ending "None"), Padding, TApperance Length & String, All Property Values, "None"
+            return [.. structBytes, .. bytes];
         }
     }
 
@@ -313,63 +455,49 @@ namespace CPoolUtil.Core
 
     public class PropertyBag
     {
-        protected Parser _parser;
-        protected IOutputter Outputter;
+        public List<CProperty> Properties = [];
+        public string DisplayValue { get; protected set; }
 
-        protected List<CProperty> properties = new List<CProperty>();
-        public IReadOnlyList<CProperty> Properties => properties;
-
-        private PropertyBag(params CProperty[] pProperties) : this((Parser)null, null)
+        public PropertyBag() { }
+        protected PropertyBag(params CProperty[] pProperties)
         {
-            properties = pProperties.ToList();
+            Properties = [.. pProperties];
         }
 
-        public PropertyBag(Parser parser, IOutputter outputter)
+        public static PropertyBag Create(params CProperty[] pProperties)
         {
-            _parser = parser;
-            Outputter = outputter;
+            return new PropertyBag(pProperties);
         }
 
-        public static PropertyBag Create(params CProperty[] properties)
+        public virtual PropertyBag Clone()
         {
-            return new PropertyBag(properties);
+            var cloned = MemberwiseClone() as PropertyBag;
+            cloned.Properties = [.. Properties.Select(p => p.Clone())];
+            return cloned;
         }
 
-        public void GetProperties()
+        public void ParseData(Parser Parser)
         {
+            Properties = [];
             // Keep reading until we hit a "None" property
             CProperty curProp;
             do
             {
-                curProp = _parser.GetProperty();
-                if (curProp != null) properties.Add(curProp);
+                curProp = Parser.GetProperty();
+                if (curProp != null) Properties.Add(curProp);
             } while (curProp != null);
+
+            DisplayValue = string.Join(" ", Properties.Select(p => $"{p.Name}:{p.Data}"));
         }
 
-        public byte[] WriteProperties()
+        public virtual byte[] WriteSizeAndData()
         {
-            var bytes = new List<byte>();
+            byte[] bytes = [.. Properties.SelectMany(p => Parser.WriteProperty(p))];
 
-            // Write each property, then a "None"
-            foreach (var prop in properties)
-                bytes.AddRange(Parser.WriteProperty(prop));
-            bytes.AddRange(Parser.WriteProperty(null));
-
-            return bytes.ToArray();
+            return [.. bytes];
         }
 
-        public PropertyBag Clone()
-        {
-            var cloned = MemberwiseClone() as PropertyBag;
-            var oldList = properties;
-            var newList = new List<CProperty>();
-            foreach (var p in oldList)
-                newList.Add(p.Clone());
-            cloned.properties = newList;
-            return cloned;
-        }
-
-        public void WriteDebug(int curTabLevel)
+        public void WriteDebug(IOutputter Outputter, int curTabLevel)
         {
             string tabs = string.Join("", Enumerable.Repeat("\t", curTabLevel));
 
@@ -378,7 +506,22 @@ namespace CPoolUtil.Core
                 Outputter.WriteLine($"{tabs}{prop.FriendlyName}: {prop.Data}");
 
                 if (prop is StructProperty sProp)
-                    sProp.Properties.WriteDebug(++curTabLevel);
+                    sProp.Properties.WriteDebug(Outputter, ++curTabLevel);
+                else if (prop is ArrayProperty aProp)
+                {
+                    foreach(var propertyBag in aProp.Properties)
+                    {
+                        propertyBag.WriteDebug(Outputter, ++curTabLevel);
+                    }
+                }
+                else if (prop is CharacterArray cProp)
+                {
+                    cProp.Header.WriteDebug(Outputter, ++curTabLevel);
+                    foreach (var propertyBag in cProp.Properties)
+                    {
+                        propertyBag.WriteDebug(Outputter, ++curTabLevel);
+                    }
+                }
             }
         }
     }

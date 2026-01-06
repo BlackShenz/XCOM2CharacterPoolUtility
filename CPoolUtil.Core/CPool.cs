@@ -7,37 +7,38 @@ namespace CPoolUtil.Core
 {
     public class CPool : PropertyBag
     {
-        private List<Character> _characters = new List<Character>();
-        private List<Character> _unchangedCharacterList = new List<Character>(); // Allows resets without reloading the entire pool
+        protected IOutputter Outputter;
+        private List<Character> _characters = [];
+        private List<Character> _unchangedCharacterList = []; // Allows resets without reloading the entire pool
 
-        public ArrayProperty CharacterPoolProp => Properties.FirstOrDefault(p => p.Name == "CharacterPool") as ArrayProperty; // Won't exist if file has no characters
-        public int NumCharacters => CharacterPoolProp?.DataVal ?? 0;
-        public StrProperty PoolFileName => Properties.FirstOrDefault(p => p.Name == "PoolFileName") as StrProperty;
+        public CharacterArray CharacterPoolProp => Properties.FirstOrDefault(p => p.Name == "CharacterPool") as CharacterArray; // Won't exist if file has no characters
+        public int NumCharacters => CharacterPoolProp?.ArrayLength ?? 0;
+        public StrProperty PoolFileName => CharacterPoolProp?.Header.Properties.FirstOrDefault(p => p.Name == "PoolFileName") as StrProperty;
         public IReadOnlyList<Character> Characters => _characters;
         public bool IsDirty { get; set; }
 
         public event Action<int> SendProgressUpdateEvent;
         public event Action<List<Character>> DuplicateCharactersIgnoredEvent;
 
-        private CPool(IOutputter outputter) : this(null, outputter)
+        public CPool(IOutputter outputter)
         {
-            properties.Add(ArrayProperty.Create("CharacterPool", 0));
-            properties.Add(StrProperty.Create("PoolFileName", "Unsaved Pool"));
-            IsDirty = true;
+            Outputter = outputter;
         }
-
-        public CPool(Parser parser, IOutputter outputter) : base(parser, outputter) { }
 
         public static CPool Create(IOutputter outputter)
         {
-            return new CPool(outputter);
+            var pool = new CPool(outputter);
+            var header = PropertyBag.Create(StrProperty.Create("PoolFileName", "Unsaved Pool"));
+            pool.Properties.Add(CharacterArray.Create("CharacterPool", header, []));
+            pool.IsDirty = true;
+            return pool;
         }
 
-        public void Load()
+        public void Load(Parser _parser)
         {
-            ReadHeader();
+            ReadFile(_parser);
             Outputter.WriteLine();
-            WriteDebug(0);
+            WriteDebug(Outputter, 0);
 
             if (_characters.Count > 0) return;
 
@@ -45,7 +46,7 @@ namespace CPoolUtil.Core
             {
                 Outputter.WriteLine();
                 Outputter.WriteLine($"Character {i + 1}");
-                var newChar = new Character(_parser, Outputter);
+                var newChar = CharacterPoolProp.Properties[i] as Character;
                 _characters.Add(newChar);
                 _unchangedCharacterList.Add(newChar.Clone());
 
@@ -59,50 +60,24 @@ namespace CPoolUtil.Core
         {
             Outputter.WriteLine($"Saving character pool to {filePath}...");
 
-            var fileBytes = WriteHeader().AsEnumerable();
-            foreach (var character in Characters)
-            {
-                Outputter.WriteLine();
-                Outputter.WriteLine($"Writing {character.FullName}...");
-                fileBytes = fileBytes.Concat(character.WriteProperties());
-            }
+            byte[] headerBytes = [0xFF, 0xFF, 0xFF, 0xFF];
+            CharacterPoolProp.UpdateCharacterList([.. Characters.AsEnumerable()]);
+            byte[] fileBytes = [.. headerBytes, .. WriteSizeAndData()];
 
-            File.WriteAllBytes(filePath, fileBytes.ToArray());
+            File.WriteAllBytes(filePath, [.. fileBytes]);
         }
 
-        private void ReadHeader()
+        private void ReadFile(Parser _parser)
         {
             // Header always consists of 4 0xFF bytes
             var header = _parser.GetBytes(4);
             if (!Enumerable.SequenceEqual(header, new byte[] { 0xFF, 0xFF, 0xFF, 0xFF }))
                 throw new Exception("Invalid file header.");
 
-            // Get header properties (CharacterPool [unless empty] and PoolFileName)
+            // Get CharacterPool [unless empty] and PoolFileName
             // NOTE: Occasionally the header has a "CharacterPoolSerializeHelper" StructProperty containing 1(?) character
             // This may cause problems if there is ever more than 1, but for now it looks like we can simply throw it away (the character also shows up in the list)
-            GetProperties();
-
-            // Read one more int and compare it against the number of characters
-            int validatedCharacterCount = _parser.GetInt();
-
-            if (validatedCharacterCount != NumCharacters)
-                throw new Exception("Character count mismatch found in header.");
-        }
-
-        private byte[] WriteHeader()
-        {
-            // Write 4 0xFF bytes to begin
-            var bytes = new List<byte>() { 0xFF, 0xFF, 0xFF, 0xFF };
-
-            // Write CharacterPool and PoolFileName (and "None" finalizer) properties only
-            bytes.AddRange(Parser.WriteProperty(CharacterPoolProp));
-            bytes.AddRange(Parser.WriteProperty(PoolFileName));
-            bytes.AddRange(Parser.WriteProperty(null));
-
-            // Write number of characters again as a standalone int
-            bytes.AddRange(Parser.WriteInt(NumCharacters));
-
-            return bytes.ToArray();
+            ParseData(_parser);
         }
 
         public void AppendCharacters(params Character[] characters)
@@ -124,7 +99,7 @@ namespace CPoolUtil.Core
                 }
             }
 
-            if (duplicates.Any())
+            if (duplicates.Count != 0)
                 DuplicateCharactersIgnoredEvent?.Invoke(duplicates);
 
             UpdateNumCharactersProperty();
@@ -164,7 +139,8 @@ namespace CPoolUtil.Core
 
         private void UpdateNumCharactersProperty()
         {
-            CharacterPoolProp.DataVal = _characters.Count;
+            // Update CharacterPool property to reflect new number of characters
+            // CharacterPoolProp.Data = $"{{\"NumCharacters\":{NumCharacters}}}";
         }
     }
 }
